@@ -1,0 +1,47 @@
+# Publica la web en GitHub Pages descomprimiendo web.zip (así solo subes un archivo).
+# Guárdalo en el repositorio como:  .github/workflows/publicar.yml
+name: Publicar web
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  desplegar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Descomprimir web.zip
+        run: |
+          test -f web.zip || { echo "Falta web.zip en la raíz del repositorio"; exit 1; }
+          mkdir _site
+          unzip -q web.zip -d _site
+          # si el zip trae una carpeta dentro (p. ej. flow_web/), se sube su contenido
+          if [ ! -f _site/index.html ]; then
+            d=$(find _site -maxdepth 2 -name index.html | head -n1 | xargs -r dirname)
+            [ -n "$d" ] || { echo "No hay index.html dentro del zip"; exit 1; }
+            mv "$d" _site_final && rm -rf _site && mv _site_final _site
+          fi
+          ls -la _site
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
